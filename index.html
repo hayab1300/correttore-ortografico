@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Correttore Ortografico AI - Versione Streaming</title>
+    <title>Correttore Ortografico AI - Streaming Sicuro</title>
     <!-- Tailwind CSS per lo styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React e ReactDOM via CDN -->
@@ -16,7 +16,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        /* Cursore lampeggiante per l'effetto scrittura */
         .typing-cursor::after {
             content: '|';
             animation: blink 1s step-start infinite;
@@ -34,19 +33,18 @@
 
         function App() {
             const [inputText, setInputText] = useState('');
-            const[correctedOutput, setCorrectedOutput] = useState('');
+            const [correctedOutput, setCorrectedOutput] = useState('');
             const [isLoading, setIsLoading] = useState(false);
             const [isStreaming, setIsStreaming] = useState(false);
             const [error, setError] = useState('');
             const [copiedType, setCopiedType] = useState(null);
-            const[userApiKey, setUserApiKey] = useState('');
+            const [userApiKey, setUserApiKey] = useState('');
 
-            // Ottimizzazione icone Lucide
             useEffect(() => {
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
-            },[isLoading, isStreaming, error, copiedType]);
+            }, [isLoading, isStreaming, error, copiedType]);
 
             const handleAnalyze = async () => {
                 if (!inputText.trim()) return;
@@ -60,16 +58,15 @@
                 setError('');
                 setCorrectedOutput('');
 
-                // Prompt ottimizzato per testo semplice (nessun JSON)
-                const systemPrompt = `Sei un correttore di test esperto. Correggi gli errori grammaticali e sintattici del testo fornito, rendendolo fluido, professionale e naturale. RESTITUISCI SOLO ED ESCLUSIVAMENTE IL TESTO CORRETTO. Non aggiungere saluti, commenti, virgolette o formattazioni.`;
+                // Prompt migliorato per evitare risposte vuote
+                const systemPrompt = `Sei un correttore di testi esperto. Correggi gli errori grammaticali e sintattici, rendendo il testo fluido e professionale. RESTITUISCI SOLO IL TESTO FINALE. Nessun commento o saluto. IMPORTANTE: Se il testo originale è già corretto, restituiscilo identico, NON lasciare la risposta vuota.`;
 
                 const payload = {
-                    contents: [{ parts:[{ text: inputText }] }],
-                    system_instruction: { parts:[{ text: systemPrompt }] }
+                    contents: [{ parts: [{ text: inputText }] }],
+                    system_instruction: { parts: [{ text: systemPrompt }] }
                 };
 
                 try {
-                    // Endpoint per lo STREAMING (alt=sse)
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${userApiKey.trim()}`;
                     
                     const response = await fetch(apiUrl, {
@@ -83,7 +80,7 @@
                         throw new Error(errorData.error?.message || `Errore HTTP ${response.status}`);
                     }
 
-                    // Gestione del flusso di dati (Parser SSE super-corazzato)
+                    // NUOVO PARSER STREAMING (Antiproiettile)
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder("utf-8");
                     let buffer = "";
@@ -95,45 +92,50 @@
                         
                         buffer += decoder.decode(value, { stream: true });
                         
-                        // Separiamo i blocchi riconoscendo qualsiasi tipo di "doppio a capo" (\n\n o \r\n\r\n)
-                        const chunks = buffer.split(/\r?\n\r?\n/);
+                        // Dividiamo il buffer riga per riga
+                        const lines = buffer.split('\n');
                         
-                        // L'ultimo pezzo potrebbe essere troncato a metà rete, lo rimettiamo in memoria (buffer)
-                        buffer = chunks.pop() || "";
+                        // Teniamo l'ultima riga nel buffer perché potrebbe essere incompleta
+                        buffer = lines.pop() || "";
 
-                        for (const chunk of chunks) {
-                            // Leggiamo riga per riga
-                            const lines = chunk.split(/\r?\n/);
-                            for (const line of lines) {
-                                if (line.startsWith("data:")) {
-                                    const dataStr = line.substring(5).trim(); // Estrae tutto dopo "data:"
-                                    if (!dataStr || dataStr === "[DONE]") continue;
+                        for (let line of lines) {
+                            line = line.trim();
+                            
+                            if (line.startsWith("data:")) {
+                                const dataStr = line.substring(5).trim();
+                                
+                                if (dataStr === "[DONE]") continue;
+                                if (!dataStr) continue;
+
+                                try {
+                                    const parsed = JSON.parse(dataStr);
                                     
-                                    try {
-                                        const parsed = JSON.parse(dataStr);
-                                        const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                                        
-                                        // Se c'è testo nuovo, aggiungilo e stampalo!
-                                        if (textPart !== undefined) {
-                                            fullText += textPart;
-                                            setCorrectedOutput(fullText);
-                                        }
-                                    } catch (e) {
-                                        console.warn("Errore di lettura del frammento:", e);
+                                    // Gestione blocchi di sicurezza di Google
+                                    if (parsed.candidates && parsed.candidates[0].finishReason === 'SAFETY') {
+                                        throw new Error("Il testo è stato bloccato dai filtri di sicurezza di Google.");
                                     }
+
+                                    const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                                    
+                                    if (textPart !== undefined && textPart !== null) {
+                                        fullText += textPart;
+                                        setCorrectedOutput(fullText);
+                                    }
+                                } catch (e) {
+                                    // Ignoriamo silenziosamente frammenti JSON non validi (verranno ricomposti nel ciclo successivo)
                                 }
                             }
                         }
                     }
 
-                    // Se alla fine di tutto l'AI non ha scritto niente (es. filtro sicurezza), mostriamo un feedback
+                    // Se per qualche motivo strano il risultato finale è completamente vuoto
                     if (!fullText.trim()) {
-                        setCorrectedOutput("Il testo non necessitava di correzioni o non è stato possibile processarlo.");
+                        setCorrectedOutput("Il testo inserito è già corretto o non è stato possibile generare una revisione.");
                     }
 
                 } catch (err) {
                     console.error("Errore catturato:", err);
-                    setError(`Errore: ${err.message}. Verifica la validità della chiave API.`);
+                    setError(`Errore: ${err.message}.`);
                 } finally {
                     setIsLoading(false);
                     setIsStreaming(false);
@@ -162,7 +164,6 @@
                     </header>
 
                     <main className="flex-grow max-w-4xl mx-auto w-full p-4 md:p-10 -mt-6">
-                        {/* Box Chiave API */}
                         <div className="mb-8 bg-white p-6 rounded-2xl border border-emerald-100 shadow-xl flex flex-col md:flex-row items-center gap-4">
                             <div className="flex items-center gap-2 text-emerald-800 font-bold whitespace-nowrap">
                                 <i data-lucide="key-round" className="w-5 h-5 text-emerald-500"></i>
@@ -177,7 +178,6 @@
                             />
                         </div>
 
-                        {/* Input Testo */}
                         <div className="mb-8 bg-white rounded-3xl shadow-lg border border-emerald-50 overflow-hidden relative">
                             {isLoading && !correctedOutput && (
                                 <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
@@ -220,7 +220,6 @@
                             </div>
                         </div>
 
-                        {/* Error Alert */}
                         {error && (
                             <div className="bg-red-50 text-red-700 p-5 rounded-2xl mb-8 border-2 border-red-100 flex items-start gap-4 animate-bounce">
                                 <i data-lucide="alert-triangle" className="w-6 h-6 mt-0.5 shrink-0"></i>
@@ -231,7 +230,6 @@
                             </div>
                         )}
 
-                        {/* Risultato in Streaming */}
                         {(correctedOutput || isLoading || isStreaming) && (
                             <div className="transition-all duration-300 transform translate-y-0 opacity-100">
                                 <div className="flex justify-between items-center mb-3 px-2">
@@ -257,12 +255,6 @@
                             </div>
                         )}
                     </main>
-
-                    <footer className="mt-10 py-8 border-t border-emerald-100 text-center bg-white/50">
-                        <p className="text-emerald-900/30 text-xs font-bold uppercase tracking-tighter">
-                            Strumento di correzione real-time basato su Gemini 2.5 Flash
-                        </p>
-                    </footer>
                 </div>
             );
         }
