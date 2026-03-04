@@ -52,12 +52,12 @@
                 setStandardOutput('');
                 setFluidOutput('');
 
-                // Prompt ottimizzato per estrarre solo JSON
-                const prompt = `Sei un correttore di bozze esperto. Correggi il testo fornito. Restituisci RIGOROSAMENTE un oggetto JSON con chiavi "standard" (correzione letterale degli errori) e "fluida" (riscrittura elegante e naturale).`;
+                // Prompt ottimizzato
+                const systemPrompt = `Sei un correttore di bozze esperto. Correggi il testo fornito. Restituisci RIGOROSAMENTE un oggetto JSON con chiavi "standard" (correzione letterale degli errori) e "fluida" (riscrittura elegante e naturale).`;
 
                 const payload = {
                     contents: [{ parts: [{ text: inputText }] }],
-                    systemInstruction: { parts: [{ text: prompt }] },
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
                     generationConfig: {
                         responseMimeType: "application/json",
                     }
@@ -70,7 +70,6 @@
                         
                         if (!response.ok) {
                             console.error("Dettaglio Errore API:", data);
-                            // Se l'errore è 404 o riguarda il modello non trovato, segnalalo chiaramente
                             throw new Error(data.error?.message || `Errore HTTP ${response.status}`);
                         }
                         return data;
@@ -82,9 +81,9 @@
                 };
 
                 try {
-                    // Utilizzo della versione v1 stabile e del modello gemini-1.5-flash-latest
-                    // Questo risolve l'errore "not found for API version v1beta"
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${userApiKey.trim()}`;
+                    // Utilizziamo v1beta perché supporta systemInstruction e responseMimeType
+                    // Utilizziamo gemini-1.5-flash che è il modello standard più compatibile
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey.trim()}`;
                     
                     const data = await fetchWithRetry(apiUrl, {
                         method: 'POST',
@@ -93,7 +92,8 @@
                     });
 
                     if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
-                        const resultJson = JSON.parse(data.candidates[0].content.parts[0].text);
+                        const rawText = data.candidates[0].content.parts[0].text;
+                        const resultJson = JSON.parse(rawText);
                         setStandardOutput(resultJson.standard || "Nessuna correzione necessaria.");
                         setFluidOutput(resultJson.fluida || "Nessuna riscrittura disponibile.");
                     } else {
@@ -101,7 +101,7 @@
                     }
                 } catch (err) {
                     console.error("Errore catturato:", err);
-                    setError(`Errore: ${err.message}. Assicurati di usare una chiave API valida per Gemini 1.5.`);
+                    setError(`Errore: ${err.message}. Verifica la validità della chiave API.`);
                 } finally {
                     setIsLoading(false);
                 }
