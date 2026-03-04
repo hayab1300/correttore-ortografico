@@ -81,8 +81,8 @@
                 };
 
                 try {
-                    // Utilizzo di gemini-1.5-flash (il modello più stabile e veloce)
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${userApiKey.trim()}`;
+                    // Cambiato l'endpoint a v1 e il modello a gemini-1.5-flash
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${userApiKey.trim()}`;
                     
                     const data = await fetchWithRetry(apiUrl, {
                         method: 'POST',
@@ -90,16 +90,16 @@
                         body: JSON.stringify(payload)
                     });
 
-                    if (data.candidates && data.candidates[0].content.parts[0].text) {
+                    if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
                         const resultJson = JSON.parse(data.candidates[0].content.parts[0].text);
                         setStandardOutput(resultJson.standard || "Nessuna correzione necessaria.");
                         setFluidOutput(resultJson.fluida || "Nessuna riscrittura disponibile.");
                     } else {
-                        throw new Error('L\'AI ha restituito una risposta vuota.');
+                        throw new Error('L\'AI ha restituito una risposta incompleta o vuota.');
                     }
                 } catch (err) {
                     console.error("Errore catturato:", err);
-                    setError(`Errore: ${err.message}. Verifica la chiave o la connessione.`);
+                    setError(`Errore: ${err.message}. Verifica che la chiave sia attiva e corretta.`);
                 } finally {
                     setIsLoading(false);
                 }
