@@ -70,6 +70,7 @@
                         
                         if (!response.ok) {
                             console.error("Dettaglio Errore API:", data);
+                            // Se l'errore è 404 o riguarda il modello non trovato, segnalalo chiaramente
                             throw new Error(data.error?.message || `Errore HTTP ${response.status}`);
                         }
                         return data;
@@ -81,8 +82,9 @@
                 };
 
                 try {
-                    // Cambiato l'endpoint a v1 e il modello a gemini-1.5-flash
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${userApiKey.trim()}`;
+                    // Utilizzo della versione v1 stabile e del modello gemini-1.5-flash-latest
+                    // Questo risolve l'errore "not found for API version v1beta"
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${userApiKey.trim()}`;
                     
                     const data = await fetchWithRetry(apiUrl, {
                         method: 'POST',
@@ -99,7 +101,7 @@
                     }
                 } catch (err) {
                     console.error("Errore catturato:", err);
-                    setError(`Errore: ${err.message}. Verifica che la chiave sia attiva e corretta.`);
+                    setError(`Errore: ${err.message}. Assicurati di usare una chiave API valida per Gemini 1.5.`);
                 } finally {
                     setIsLoading(false);
                 }
