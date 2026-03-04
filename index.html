@@ -30,23 +30,23 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
         function App() {
             const [inputText, setInputText] = useState('');
-            const [correctedOutput, setCorrectedOutput] = useState('');
+            const[correctedOutput, setCorrectedOutput] = useState('');
             const [isLoading, setIsLoading] = useState(false);
             const [isStreaming, setIsStreaming] = useState(false);
-            const[error, setError] = useState('');
+            const [error, setError] = useState('');
             const [copiedType, setCopiedType] = useState(null);
-            const [userApiKey, setUserApiKey] = useState('');
+            const[userApiKey, setUserApiKey] = useState('');
 
-            // Ottimizzazione: aggiorna le icone solo quando cambiano gli stati principali (non durante lo streaming del testo)
+            // Ottimizzazione icone Lucide
             useEffect(() => {
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
-            }, [isLoading, error, copiedType]);
+            },[isLoading, isStreaming, error, copiedType]);
 
             const handleAnalyze = async () => {
                 if (!inputText.trim()) return;
@@ -64,13 +64,12 @@
                 const systemPrompt = `Sei un correttore di test esperto. Correggi gli errori grammaticali e sintattici del testo fornito, rendendolo fluido, professionale e naturale. RESTITUISCI SOLO ED ESCLUSIVAMENTE IL TESTO CORRETTO. Non aggiungere saluti, commenti, virgolette o formattazioni.`;
 
                 const payload = {
-                    contents: [{ parts: [{ text: inputText }] }],
+                    contents: [{ parts:[{ text: inputText }] }],
                     system_instruction: { parts:[{ text: systemPrompt }] }
-                    // NIENTE PIÙ JSON CONSTRAINT!
                 };
 
                 try {
-                    // Endpoint aggiornato per lo STREAMING (alt=sse)
+                    // Endpoint per lo STREAMING (alt=sse)
                     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${userApiKey.trim()}`;
                     
                     const response = await fetch(apiUrl, {
@@ -84,7 +83,7 @@
                         throw new Error(errorData.error?.message || `Errore HTTP ${response.status}`);
                     }
 
-                    // Gestione del flusso di dati in tempo reale (Server-Sent Events)
+                    // Gestione del flusso di dati (Parser SSE super-corazzato)
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder("utf-8");
                     let buffer = "";
@@ -96,37 +95,48 @@
                         
                         buffer += decoder.decode(value, { stream: true });
                         
-                        // Dividi il buffer ad ogni doppio a capo (formato standard SSE)
-                        let boundary = buffer.indexOf('\n\n');
-                        while (boundary !== -1) {
-                            const chunk = buffer.slice(0, boundary).trim();
-                            buffer = buffer.slice(boundary + 2);
-                            
-                            if (chunk.startsWith('data:')) {
-                                const dataStr = chunk.slice(5).trim();
-                                if (dataStr) {
+                        // Separiamo i blocchi riconoscendo qualsiasi tipo di "doppio a capo" (\n\n o \r\n\r\n)
+                        const chunks = buffer.split(/\r?\n\r?\n/);
+                        
+                        // L'ultimo pezzo potrebbe essere troncato a metà rete, lo rimettiamo in memoria (buffer)
+                        buffer = chunks.pop() || "";
+
+                        for (const chunk of chunks) {
+                            // Leggiamo riga per riga
+                            const lines = chunk.split(/\r?\n/);
+                            for (const line of lines) {
+                                if (line.startsWith("data:")) {
+                                    const dataStr = line.substring(5).trim(); // Estrae tutto dopo "data:"
+                                    if (!dataStr || dataStr === "[DONE]") continue;
+                                    
                                     try {
                                         const parsed = JSON.parse(dataStr);
                                         const textPart = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-                                        if (textPart) {
+                                        
+                                        // Se c'è testo nuovo, aggiungilo e stampalo!
+                                        if (textPart !== undefined) {
                                             fullText += textPart;
-                                            // Aggiorna la UI istantaneamente
                                             setCorrectedOutput(fullText);
                                         }
                                     } catch (e) {
-                                        console.warn("Errore di parsing del chunk", e);
+                                        console.warn("Errore di lettura del frammento:", e);
                                     }
                                 }
                             }
-                            boundary = buffer.indexOf('\n\n');
                         }
                     }
+
+                    // Se alla fine di tutto l'AI non ha scritto niente (es. filtro sicurezza), mostriamo un feedback
+                    if (!fullText.trim()) {
+                        setCorrectedOutput("Il testo non necessitava di correzioni o non è stato possibile processarlo.");
+                    }
+
                 } catch (err) {
                     console.error("Errore catturato:", err);
-                    setError(`Errore: ${err.message}. Verifica la chiave API.`);
+                    setError(`Errore: ${err.message}. Verifica la validità della chiave API.`);
                 } finally {
                     setIsLoading(false);
-                    setIsStreaming(false); // Ferma l'effetto del cursore lampeggiante
+                    setIsStreaming(false);
                 }
             };
 
@@ -222,7 +232,7 @@
                         )}
 
                         {/* Risultato in Streaming */}
-                        {(correctedOutput || isLoading) && (
+                        {(correctedOutput || isLoading || isStreaming) && (
                             <div className="transition-all duration-300 transform translate-y-0 opacity-100">
                                 <div className="flex justify-between items-center mb-3 px-2">
                                     <div className="flex items-center gap-2">
