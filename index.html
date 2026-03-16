@@ -58,8 +58,8 @@
                 setError('');
                 setCorrectedOutput('');
 
-                // Prompt migliorato per evitare risposte vuote
-                const systemPrompt = `Sei un correttore di testi esperto. Correggi gli errori grammaticali e sintattici, rendendo il testo fluido e professionale. RESTITUISCI SOLO IL TESTO FINALE. Nessun commento o saluto. IMPORTANTE: Se il testo originale è già corretto, restituiscilo identico, NON lasciare la risposta vuota.`;
+                // Prompt migliorato per limitare le correzioni e mantenere fedeltà al testo
+                const systemPrompt = `Sei un revisore di testi. Il tuo compito è limitare la correzione agli errori grammaticali, ortografici e sintattici più grossolani. Per tutto il resto, mantieni il più possibile la fedeltà al testo originale. RESTITUISCI SOLO IL TESTO FINALE. Nessun commento o saluto. IMPORTANTE: Se il testo originale non presenta errori grossolani, restituiscilo identico, NON lasciare la risposta vuota e NON alterare lo stile originale.`;
 
                 const payload = {
                     contents: [{ parts: [{ text: inputText }] }],
