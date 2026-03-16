@@ -44,6 +44,17 @@
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
+                // Caricamento del prompt dal file esterno
+                fetch('prompt.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        window.systemPromptFromConfig = data.systemPrompt;
+                    })
+                    .catch(err => {
+                        console.error("Errore nel caricamento del prompt:", err);
+                        // Fallback in caso di errore
+                        window.systemPromptFromConfig = "Sei un correttore di testi. Correggi gli errori grossolani. RESTITUISCI SOLO IL TESTO FINALE.";
+                    });
             }, [isLoading, isStreaming, error, copiedType]);
 
             const handleAnalyze = async () => {
@@ -58,8 +69,8 @@
                 setError('');
                 setCorrectedOutput('');
 
-                // Prompt migliorato per limitare le correzioni e mantenere fedeltà al testo
-                const systemPrompt = `Sei un revisore di testi. Il tuo compito è limitare la correzione agli errori grammaticali, ortografici e sintattici più grossolani. Per tutto il resto, mantieni il più possibile la fedeltà al testo originale. RESTITUISCI SOLO IL TESTO FINALE. Nessun commento o saluto. IMPORTANTE: Se il testo originale non presenta errori grossolani, restituiscilo identico, NON lasciare la risposta vuota e NON alterare lo stile originale.`;
+                // Recupero del prompt caricato asincronamente (o fallback)
+                const systemPrompt = window.systemPromptFromConfig || `Sei un correttore di testi esperto. Correggi gli errori grammaticali e sintattici. RESTITUISCI SOLO IL TESTO FINALE.`;
 
                 const payload = {
                     contents: [{ parts: [{ text: inputText }] }],
